@@ -5,8 +5,12 @@ env:
 phases:
   pre_build:
     commands:
+      - echo start
       - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
       - APP_REPOSITORY_URI=`aws ssm get-parameters --names "/$DEPLOY_STAGE/ECR/app-uri" --with-decryption --region $AWS_DEFAULT_REGION --output text --query Parameters[0].Value`
+      - echo deploy_stage $DEPLOY_STAGE
+      - echo APP_REPOSITORY_URI $APP_REPOSITORY_URI
+      - echo WEB_REPOSITORY_URI $WEB_REPOSITORY_URI
       - docker pull $APP_REPOSITORY_URI:$DEPLOY_STAGE || true
       - docker pull $WEB_REPOSITORY_URI:$DEPLOY_STAGE || true
   build:

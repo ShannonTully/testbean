@@ -1,48 +1,21 @@
-version: '3'
-
-services:
-  db:
-    restart: always
-    image: postgres:9.6-alpine
-    volumes:
-    - postgres_data:/var/lib/postgresql/data/
-    ports:
-      - "5432:5432"
-
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: always
-
-  web:
-    restart: always
-    env_file: .env
-    build: .
-    container_name: 'reviews_web'
-    command: ./entrypoint.sh
-    volumes:
-      - .:/src
-      - /static:/src/static
-    ports:
-      - '8000:8000'
-    depends_on:
-      - db
-      - redis
-
-  nginx:
-    restart: always
-    container_name: nginx_server
-    build:
-      context: ./docker_compose/
-      dockerfile: Dockerfile
-    depends_on:
-      - web
-    ports:
-      - "80:80"
-
-volumes:
-  postgres_data:
-  redis_data:
+version: 0.2
+env:
+  variables:
+    APP_IMAGE_REPO_NAME: "my_app"
+phases:
+  pre_build:
+    - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+    - APP_REPOSITORY_URI=`aws ssm get-parameters --names "/$DEPLOY_STAGE/ECR/app-uri" --with-decryption --region $AWS_DEFAULT_REGION --output text --query Parameters[0].Value`
+    - docker pull $APP_REPOSITORY_URI:$DEPLOY_STAGE || true
+    - docker pull $WEB_REPOSITORY_URI:$DEPLOY_STAGE || true
+  build:
+    - echo Build started on `date`
+    - docker-compose build
+    - echo Build completed on `date`
+  post_build:
+    - docker tag $APP_IMAGE_REPO_NAME:latest $APP_REPOSITORY_URI:$DEPLOY_STAGE
+    - docker tag $WEB_IMAGE_REPO_NAME:latest $WEB_REPOSITORY_URI:$DEPLOY_STAGE
+    - echo Images tagged
+    - docker push $APP_REPOSITORY_URI:$DEPLOY_STAGE
+    - docker push $WEB_REPOSITORY_URI:$DEPLOY_STAGE
+    - echo Images pushed to repositories
